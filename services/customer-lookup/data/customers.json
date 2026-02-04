@@ -1,0 +1,20 @@
+{
+  "000_000_001": {
+    "customer_id": "CUSTOMER_000_000_001",
+    "name": "John Smith",
+    "addresses": ["1 Main St, London", "1 Second Avenue, New York"],
+    "annual_income": 36000
+  },
+  "000_000_002": {
+    "customer_id": "CUSTOMER_000_000_002",
+    "name": "Jane Doe",
+    "addresses": ["1 High Street, Darlington"],
+    "annual_income": 50000
+  },
+  "000_000_003": {
+    "customer_id": "CUSTOMER_000_000_003",
+    "name": "Joe Bloggs",
+    "addresses": ["1 Main Road, New York", "1 River Street, Manchester"],
+    "annual_income": 120000
+  }
+}

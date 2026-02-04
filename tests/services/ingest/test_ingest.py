@@ -7,6 +7,18 @@ from services.ingest.config import MAX_FILE_SIZE
 
 client = TestClient(app)
 
+# mock customer lookup id validation
+@pytest.fixture(autouse=True)
+def mock_customer_validation(monkeypatch):
+
+    async def mock_validate(customer_id: str):
+        return customer_id
+    
+    monkeypatch.setattr(
+        "services.ingest.utils.validate_customer_id",
+        mock_validate
+    )
+
 # override upload dir for tests
 @pytest.fixture(autouse=True)
 def temp_upload_dir(tmp_path, monkeypatch):
@@ -20,10 +32,12 @@ def test_upload_file_valid_success():
     file_content = b"test file content"
     file_name = "test.pdf"
     file_type = "application/pdf"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -31,6 +45,7 @@ def test_upload_file_valid_success():
     data = response.json()
     assert data["filename"] == file_name
     assert data["content_type"] == file_type
+    assert data["customer_id"] == customer_id
     
     # Check file was saved
     saved_path = data["saved_at"]
@@ -38,16 +53,38 @@ def test_upload_file_valid_success():
     with open(saved_path, "rb") as f:
         assert f.read() == file_content
 
+# upload a valid file with an invalid customer id
+def test_upload_file_invalid_customer_id_fail(monkeypatch):
+    # mock file contents
+    file_content = b"test file content"
+    file_name = "test.pdf"
+    file_type = "application/pdf"
+    customer_id = "000_000_000"
+    
+    response = client.post(
+        "/upload",
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
+    )
+    
+    # Check response status
+    assert response.status_code == 404
+    data = response.json()
+    assert set(data.keys()) == {"detail"}
+    assert "not found" in data["detail"].lower()
+
 # upload a file with additional file_type args
 def test_upload_file_additional_file_type_args_sucess():
     # mock file contents
     file_content = b"test file content"
     file_name = "test.pdf"
     file_type = "application/pdf; charset=binary"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -55,6 +92,7 @@ def test_upload_file_additional_file_type_args_sucess():
     data = response.json()
     assert data["filename"] == file_name
     assert data["content_type"] == file_type
+    assert data["customer_id"] == customer_id
     
     # Check file was saved
     saved_path = data["saved_at"]
@@ -68,10 +106,12 @@ def test_upload_file_capitalised_file_type_success():
     file_content = b"test file content"
     file_name = "test.pdf"
     file_type = "APPLICATION/PDF"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -79,6 +119,7 @@ def test_upload_file_capitalised_file_type_success():
     data = response.json()
     assert data["filename"] == file_name
     assert data["content_type"] == file_type
+    assert data["customer_id"] == customer_id
     
     # Check file was saved
     saved_path = data["saved_at"]
@@ -92,10 +133,12 @@ def test_upload_file_invalid_filetype_fail():
     file_content = b"test file content"
     file_name = "test.txt"
     file_type = "text/plain"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -111,10 +154,12 @@ def test_upload_file_invalid_filepath_fail():
     file_content = b"test file content"
     file_name = "test.txt"
     file_type = "text/plain"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -130,10 +175,12 @@ def test_upload_file_empty_content_fail():
     file_content = b""
     file_name = "empty.pdf"
     file_type = "application/pdf"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -149,10 +196,12 @@ def test_upload_file_on_size_limit_success():
     file_content = b"x" * (MAX_FILE_SIZE) 
     file_name = "big.pdf"
     file_type = "application/pdf"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
@@ -173,10 +222,12 @@ def test_upload_file_over_size_limit_fail():
     file_content = b"x" * (MAX_FILE_SIZE+1) 
     file_name = "big.pdf"
     file_type = "application/pdf"
+    customer_id = "000_000_001"
     
     response = client.post(
         "/upload",
-        files={"file": (file_name, file_content, file_type)}
+        files={"file": (file_name, file_content, file_type)},
+        data={"customer_id": (customer_id)}
     )
     
     # Check response status
