@@ -1,9 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from services.extraction.utils import extract_text_from_pdf
 from services.extraction.parser import parse_document
 from services.extraction.config import DEBUG
-from models.models import Document, ExtractionRequest, ExtractionResponse
+from models.models import ExtractionRequest, ExtractionResponse
 import os
 
 app = FastAPI()
