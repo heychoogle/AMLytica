@@ -24,3 +24,14 @@ class AnalysisResponse(BaseModel):
     filename: str
     summary: Dict[str, Decimal]
     alerts: Dict[str, List[Dict[str, Any]]]
+
+class ExtractionRequest(BaseModel):
+    file_path: str
+    customer_id: str
+    filename: str
+
+
+class ExtractionResponse(BaseModel):
+    document: Document
+    extraction_method: str
+    confidence: float

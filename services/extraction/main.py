@@ -3,25 +3,10 @@ from pydantic import BaseModel
 from services.extraction.utils import extract_text_from_pdf
 from services.extraction.parser import parse_document
 from services.extraction.config import DEBUG
-from models.models import Document
+from models.models import Document, ExtractionRequest, ExtractionResponse
 import os
 
 app = FastAPI()
-
-
-class ExtractionRequest(BaseModel):
-    """Request model for extraction endpoint"""
-    file_path: str
-    customer_id: str
-    filename: str
-
-
-class ExtractionResponse(BaseModel):
-    """Response model for extraction endpoint"""
-    document: Document
-    extraction_method: str
-    confidence: float
-
 
 @app.post("/extract", response_model=ExtractionResponse)
 async def extract_document(request: ExtractionRequest):
