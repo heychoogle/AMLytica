@@ -1,9 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Dict, Any
-from datetime import datetime
-from models.models import Document, Transaction, AnalysisRequest, AnalysisResponse
-from datetime import datetime
+from fastapi import FastAPI
+from models.models import AnalysisRequest, AnalysisResponse
 from decimal import Decimal
 from services.analysis.config import DEBUG, SOFT_FLAG_EPSILON
 
@@ -30,7 +26,8 @@ def analyze_document(req: AnalysisRequest):
         prev = transactions_sorted[i-1]
 
         if(t.date.isoformat != transactions_sorted[i].date.isoformat):
-            print(f"Transaction {i} date misaligned with sorted transaction list")
+            if DEBUG:
+                print(f"Hard flag raised: date_mismatch at Transaction {i}. Date misaligned with sorted transaction list.\nAre these transactions in sorted order?")
             hard_flags.append({
                 "type": "date_mismatch",
                 "transaction_id": t.transaction_id,
@@ -42,6 +39,13 @@ def analyze_document(req: AnalysisRequest):
 
         expected_balance = prev.balance + t.amount
         if expected_balance != t.balance:
+            if DEBUG:
+                expected_for_print = prev.balance + t.amount if t.amount >= 0 else prev.balance - abs(t.amount)
+                print(
+                    f"Hard flag raised: balance_mismatch between Transaction {i} and Transaction {i-1}.\n"
+                    f"Actual balance {t.balance} should be {expected_for_print} "
+                    f"(Previous balance {prev.balance} {'+' if t.amount >= 0 else '-'} transaction amount {abs(t.amount)})\n"
+                )
             hard_flags.append({
                 "type": "balance_mismatch",
                 "date": t.date.isoformat(),
@@ -66,15 +70,21 @@ def analyze_document(req: AnalysisRequest):
 
     soft_flags = [
         {
-            "type": "std_dev_outlier", 
-            "transaction_id": t.transaction_id, 
-            "amount": t.amount, 
-            "date": t.date, 
+            "type": "std_dev_outlier",
+            "transaction_id": t.transaction_id,
+            "amount": t.amount,
+            "date": t.date,
             "vendor": t.vendor,
-            "std_dev_deviation": round(abs(t.amount - mean_amt)/std_amt, 2), 
-            "std_dev_threshold": SOFT_FLAG_EPSILON}
+            "std_dev_deviation": deviation,
+            "std_dev_threshold": SOFT_FLAG_EPSILON
+        }
         for t in transactions
-        if std_amt > 0 and abs(t.amount - mean_amt) > Decimal(SOFT_FLAG_EPSILON) * std_amt
+        if std_amt > 0
+        and (deviation := round(abs(t.amount - mean_amt) / std_amt, 2)) > Decimal(SOFT_FLAG_EPSILON)
+        and (print(
+            f"Soft flag raised: std_dev_outlier at Transaction {t.transaction_id}.\n"
+            f"Deviation {deviation} greater than Soft Flag epsilon value of {SOFT_FLAG_EPSILON}\n"
+        ) or True)
     ]
 
     return AnalysisResponse(

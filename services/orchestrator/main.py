@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 import httpx
-from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL, ANALYSIS_URL, REPORT_URL
+from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL, ANALYSIS_URL
 
 app = FastAPI()
 
