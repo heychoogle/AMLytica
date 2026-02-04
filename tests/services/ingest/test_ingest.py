@@ -1,18 +1,16 @@
 import os
-import shutil
 import pytest
-import time
 from fastapi.testclient import TestClient
 
 from services.ingest.main import app
-from services.ingest.config import UPLOAD_DIR, MAX_FILE_SIZE
+from services.ingest.config import MAX_FILE_SIZE
 
 client = TestClient(app)
 
 # override upload dir for tests
 @pytest.fixture(autouse=True)
 def temp_upload_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.ingest.main.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr("services.ingest.config.UPLOAD_DIR", tmp_path)
     return tmp_path
 
 
