@@ -1,6 +1,8 @@
 import os
 import pytest
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from services.ingest.main import app
 from services.ingest.config import MAX_FILE_SIZE
@@ -9,15 +11,10 @@ client = TestClient(app)
 
 # mock customer lookup id validation
 @pytest.fixture(autouse=True)
-def mock_customer_validation(monkeypatch):
-
-    async def mock_validate(customer_id: str):
-        return customer_id
-    
-    monkeypatch.setattr(
-        "services.ingest.utils.validate_customer_id",
-        mock_validate
-    )
+def mock_customer_validation():
+    with patch('services.ingest.utils.validate_customer_id', new_callable=AsyncMock) as mock:
+        mock.side_effect = lambda customer_id: customer_id
+        yield mock
 
 # override upload dir for tests
 @pytest.fixture(autouse=True)
@@ -55,11 +52,15 @@ def test_upload_file_valid_success():
 
 # upload a valid file with an invalid customer id
 def test_upload_file_invalid_customer_id_fail(monkeypatch):
+
     # mock file contents
     file_content = b"test file content"
     file_name = "test.pdf"
     file_type = "application/pdf"
     customer_id = "000_000_000"
+
+    with patch('services.ingest.utils.validate_customer_id', new_callable=AsyncMock) as mock:
+        mock.side_effect = HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
     
     response = client.post(
         "/upload",
