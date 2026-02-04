@@ -3,10 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Minimum transactions required for meaningful analysis
 MIN_TRANSACTIONS = int(os.getenv("MIN_TRANSACTIONS", "30"))
 
-# Confidence threshold for OCR (0-100)
 OCR_CONFIDENCE_THRESHOLD = float(os.getenv("OCR_CONFIDENCE_THRESHOLD", "60.0"))
 
 # Service addresses
