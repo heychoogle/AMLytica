@@ -12,7 +12,7 @@ client = TestClient(app)
 # mock customer lookup id validation
 @pytest.fixture(autouse=True)
 def mock_customer_validation():
-    with patch('services.ingest.utils.validate_customer_id', new_callable=AsyncMock) as mock:
+    with patch('services.ingest.main.validate_customer_id', new_callable=AsyncMock) as mock:
         mock.side_effect = lambda customer_id: customer_id
         yield mock
 
@@ -59,14 +59,14 @@ def test_upload_file_invalid_customer_id_fail(monkeypatch):
     file_type = "application/pdf"
     customer_id = "000_000_000"
 
-    with patch('services.ingest.utils.validate_customer_id', new_callable=AsyncMock) as mock:
+    with patch('services.ingest.main.validate_customer_id', new_callable=AsyncMock) as mock:
         mock.side_effect = HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
     
-    response = client.post(
-        "/upload",
-        files={"file": (file_name, file_content, file_type)},
-        data={"customer_id": (customer_id)}
-    )
+        response = client.post(
+            "/upload",
+            files={"file": (file_name, file_content, file_type)},
+            data={"customer_id": (customer_id)}
+        )
     
     # Check response status
     assert response.status_code == 404
