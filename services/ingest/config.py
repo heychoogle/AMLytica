@@ -4,11 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 DEBUG = os.getenv("DEBUG") == "True"
 UPLOAD_DIR = os.getenv("UPLOAD_DIR")
-MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE")) * 1024 * 1024
+MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE"), 10) * 1024 * 1024
 ALLOWED_TYPES = {"application/pdf", "image/png", "image/jpeg"}
 
 if not UPLOAD_DIR:
     raise RuntimeError("UPLOAD_DIR not set in .env")
-
-if not MAX_FILE_SIZE:
-    MAX_FILE_SIZE = 10 * 1024 * 1024
+    
