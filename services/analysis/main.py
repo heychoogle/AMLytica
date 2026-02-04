@@ -5,15 +5,15 @@ from services.analysis.config import DEBUG, SOFT_FLAG_EPSILON
 
 app = FastAPI()
 
-@app.post("/analyze", response_model=AnalysisResponse)
-def analyze_document(req: AnalysisRequest):
+@app.post("/analyse", response_model=AnalysisResponse)
+def analyse_document(req: AnalysisRequest):
     doc = req.document
     transactions = doc.transactions
 
     total_inflow = sum(t.amount for t in transactions if t.amount > 0)
     total_outflow = sum(t.amount for t in transactions if t.amount < 0)
     net_change = total_inflow + total_outflow
-    avg_daily_balance = sum(t.balance for t in transactions) / Decimal(len(transactions))
+    avg_daily_balance = sum(t.balance for t in transactions) / Decimal(len(transactions)) if transactions else Decimal(0)
 
     # Hard flags
     transactions_sorted = sorted(transactions, key=lambda t: t.date)
@@ -87,7 +87,7 @@ def analyze_document(req: AnalysisRequest):
         ) or True)
     ]
 
-    return AnalysisResponse(
+    response_data = AnalysisResponse(
         customer_id=doc.customer_id,
         filename=doc.filename,
         summary={
@@ -101,3 +101,5 @@ def analyze_document(req: AnalysisRequest):
             "hard_flags": hard_flags,
         }
     )
+
+    return response_data

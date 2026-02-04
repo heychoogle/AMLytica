@@ -56,7 +56,7 @@ async def run_pipeline(
 
         # analysis service
         analysis_resp = await client.post(
-            f"{ANALYSIS_URL}/analyze",
+            f"{ANALYSIS_URL}/analyse",
             json={"document": extraction_data["document"]},
         )
         if analysis_resp.status_code != 200:
