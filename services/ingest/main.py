@@ -6,6 +6,7 @@ app = FastAPI()
 
 @app.post("/upload")
 async def upload_single_file(file: UploadFile = File(...)):
+    
     # validate file type
     mime_type = file.content_type.split(";")[0].lower()
     if mime_type not in ALLOWED_TYPES:
