@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 DEBUG = os.getenv("DEBUG") == "True"
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/uploads/tmp")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/uploads")
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE") or 10) * 1024 * 1024
 ALLOWED_TYPES = {"application/pdf", "image/png", "image/jpeg"}
 
