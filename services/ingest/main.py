@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from services.ingest.utils import save_uploaded_file, validate_customer_id
+from services.ingest.utils import save_uploaded_file
 from services.ingest.config import UPLOAD_DIR, DEBUG, MAX_FILE_SIZE, ALLOWED_TYPES
 
 app = FastAPI()
@@ -9,9 +9,6 @@ async def upload_single_file(
     file: UploadFile = File(...), 
     customer_id: str = Form(...)
     ):
-
-    # fail fast check to ensure customer exists before doing anything else
-    await validate_customer_id(customer_id)
     
     # validate file type
     mime_type = file.content_type.split(";")[0].lower()

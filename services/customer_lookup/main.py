@@ -11,7 +11,7 @@ with open(DATA_FILE, "r") as f:
     CUSTOMERS = json.load(f)
 
 @app.get("/exists/{customer_id}")
-def get_customer(customer_id: str):
+def validate_customer_id(customer_id: str):
     """
     Look up customer by ID.
     Returns customer ID if found, else error

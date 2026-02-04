@@ -1,7 +1,8 @@
 - fastapi
-- 5 services
+- 6 services
+    - orchestrator service: single source of truth and coordinates calls between services, validates
+    - customer lookup service: verifies customer ID for orchestrator serviceand returns it if found. Later pinged by analysis service for full customer details.
     - ingest service: takes file uploads, validates files, basic sanity checks
-    - customer lookup service: pinged by ingest service, verifies customer details (if found) are valid and passes valid customer ID back to ingest service. Later pinged by analysis service for full customer details.
     - extraction service: receives valid data from ingest service and converts PDFs to text (pdfplumber) or uses OCR to convert scanned docs to text (pytesseract)
     - analysis service: receives data from extraction service and applies models/checks, forms risk score. Raises soft flags for potential inconsistencies or mathematical outliers, raises hard flags for impossibilities like mathematical errors (i.e. balance does not add up). Also uses customer ID to ping customer-lookup and pull name/address/income data, to flag errors in document content/income or inbound transactions that don't appear to line up with income.
     - report service: receives results from analysis service and highlights risks or flags
