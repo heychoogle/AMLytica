@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from services.extraction.utils import extract_text_from_pdf
 from services.extraction.parser import parse_document
 from services.extraction.config import DEBUG
-from models.document import Document
+from models.models import Document
 import os
 
 app = FastAPI()
@@ -56,7 +56,7 @@ async def extract_document(request: ExtractionRequest):
         if DEBUG:
             print("=" * 50)
             print("EXTRACTED TEXT:")
-            print(raw_text[:1000])  # First 1000 chars
+            print(raw_text)  # First 1000 chars
             print("=" * 50)
 
             print(f"Extraction method: {method}, confidence: {confidence:.1f}%")

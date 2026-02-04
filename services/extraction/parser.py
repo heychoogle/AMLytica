@@ -1,6 +1,8 @@
 import re
+from datetime import datetime
+from decimal import Decimal
 from typing import List, Optional
-from models.document import Document, Transaction
+from models.models import Document, Transaction
 from services.extraction.config import MIN_TRANSACTIONS, DEBUG
 
 
@@ -136,8 +138,8 @@ def _extract_transactions(raw_text: str, customer_id: str, filename: str) -> Lis
         
         # Parse amount and balance
         try:
-            amount = float(amount_str)
-            balance = float(balance_str)
+            amount = Decimal(amount_str)
+            balance = Decimal(balance_str)
         except ValueError:
             if DEBUG:
                 print(f"Failed to parse transaction: {line}")
@@ -147,9 +149,11 @@ def _extract_transactions(raw_text: str, customer_id: str, filename: str) -> Lis
         filename_base = filename.replace('.pdf', '').replace('.', '_')
         txn_id = f"{customer_id}_{filename_base}_{txn_counter:03d}"
         
+        date_obj = datetime.strptime(date_str, "%d/%m/%Y")
+
         transactions.append(Transaction(
             transaction_id=txn_id,
-            date=date_str,
+            date=date_obj,
             vendor=vendor,
             amount=amount,
             balance=balance

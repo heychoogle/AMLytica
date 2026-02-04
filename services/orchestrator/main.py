@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 import httpx
-from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL 
+from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL, ANALYSIS_URL, REPORT_URL
 
 app = FastAPI()
 
@@ -12,7 +12,7 @@ async def run_pipeline(
 ):
     async with httpx.AsyncClient(timeout=60) as client:
 
-        # 1. Validate customer
+        # customer_lookup service
         customer_resp = await client.get(
             f"{CL_URL}/exists/{customer_id}"
         )
@@ -22,7 +22,7 @@ async def run_pipeline(
                 detail="Invalid customer_id"
             )
 
-        # 2. Upload file
+        # ingest service
         ingest_resp = await client.post(
             f"{INGEST_URL}/upload",
             files={"file": (file.filename, await file.read(), file.content_type)},
@@ -36,7 +36,7 @@ async def run_pipeline(
 
         ingest_data = ingest_resp.json()
 
-        # 3. Extract document
+        # extract service
         extract_resp = await client.post(
             f"{EXTRACTION_URL}/extract",
             json={
@@ -52,19 +52,20 @@ async def run_pipeline(
             )
 
         extraction_data = extract_resp.json()
+        print(extract_resp.json())
 
-        # # 4. Analyze document
-        # analysis_resp = await client.post(
-        #     f"{ANALYSIS_URL}/analyze",
-        #     json=extraction_data["document"],
-        # )
-        # if analysis_resp.status_code != 200:
-        #     raise HTTPException(
-        #         status_code=500,
-        #         detail="Analysis failed"
-        #     )
+        # analysis service
+        analysis_resp = await client.post(
+            f"{ANALYSIS_URL}/analyze",
+            json={"document": extraction_data["document"]},
+        )
+        if analysis_resp.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Analysis failed"
+            )
 
-        # analysis_data = analysis_resp.json()
+        analysis_data = analysis_resp.json()
 
         # # 5. Generate report
         # report_resp = await client.post(
@@ -82,5 +83,5 @@ async def run_pipeline(
 
         return {
             "status": "complete",
-            "report": extraction_data,
+            "report": analysis_data,
         }
