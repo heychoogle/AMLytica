@@ -30,7 +30,7 @@ def create_analysis_request(transactions=None):
         customer_address="123 Main St, Dublin",
         transactions=transactions
     )
-    return AnalysisRequest(document=doc)
+    return AnalysisRequest(document=doc, address=doc.customer_address)
 
 def test_analysis_clean_no_flags():
     """Test analysis with normal transactions, expect no flags"""
@@ -105,7 +105,7 @@ def test_analysis_empty_transactions():
         customer_address="123 Main St, Dublin",
         transactions=[]
     )
-    req = AnalysisRequest(document=doc)
+    req = AnalysisRequest(document=doc, address=doc.customer_address)
     response = client.post("/analyse", json=jsonable_encoder(req))
     
     assert response.status_code == 200

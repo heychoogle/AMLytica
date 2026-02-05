@@ -26,6 +26,22 @@ def validate_customer_id(customer_id: str):
     
     return customer_id
 
+@app.get("/get_address/{customer_id}")
+def get_customer_address(customer_id: str):
+    """
+    Look up customer by ID.
+    Returns customer ID if found, else error
+    """
+    customer = CUSTOMERS.get(customer_id)
+    
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Customer {customer_id} not found"
+        )
+    
+    return customer["address"][0]
+
 @app.get("/")
 def read_root():
     return {"status": "ok", "service": "customer-lookup"}

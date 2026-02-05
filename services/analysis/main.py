@@ -7,8 +7,11 @@ app = FastAPI()
 
 @app.post("/analyse", response_model=AnalysisResponse)
 def analyse_document(req: AnalysisRequest):
+    address = req.address
     doc = req.document
     transactions = doc.transactions
+
+    hard_flags = []
 
     total_inflow = sum(t.amount for t in transactions if t.amount > 0)
     total_outflow = sum(t.amount for t in transactions if t.amount < 0)
@@ -16,9 +19,25 @@ def analyse_document(req: AnalysisRequest):
     avg_daily_balance = sum(t.balance for t in transactions) / Decimal(len(transactions)) if transactions else Decimal(0)
 
     # Hard flags
+
+    ### address mismatch
+    if(address != doc.customer_address):
+        if DEBUG:
+            print(
+                f"Hard flag raised: address_mismatch between Customer profile and provided document\n"
+                f"Customer profile: {address}\n"
+                f"Document: {doc.customer_address}\n"
+            )
+        hard_flags.append({
+            "type": "address_mismatch",
+            "customer_profile_address": address,
+            "document_address": doc.customer_address,
+        })
+
+
+    ### date and balance mismatches
     transactions_sorted = sorted(transactions, key=lambda t: t.date)
 
-    hard_flags = []
     for i, t in enumerate(transactions):
         if i == 0:
             continue
@@ -89,6 +108,7 @@ def analyse_document(req: AnalysisRequest):
 
     response_data = AnalysisResponse(
         customer_id=doc.customer_id,
+        customer_address=address,
         filename=doc.filename,
         summary={
             "total_inflow": total_inflow,

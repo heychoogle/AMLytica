@@ -18,9 +18,11 @@ class Document(BaseModel):
 
 class AnalysisRequest(BaseModel):
     document: Document
+    address: str
 
 class AnalysisResponse(BaseModel):
     customer_id: str
+    customer_address: str
     filename: str
     summary: Dict[str, Decimal]
     alerts: Dict[str, List[Dict[str, Any]]]
