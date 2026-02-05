@@ -22,6 +22,12 @@ def parse_document(raw_text: str, customer_id: str, filename: str) -> Document:
         ValueError: If unable to parse required fields or insufficient transactions
     """
     
+    # Extract account holder name
+    account_holder_name = _extract_account_holder(raw_text)
+    
+    if not account_holder_name:
+        raise ValueError("Could not extract account holder name from document")
+
     # Extract customer address
     customer_address = _extract_address(raw_text)
     
@@ -42,11 +48,24 @@ def parse_document(raw_text: str, customer_id: str, filename: str) -> Document:
     
     return Document(
         customer_id=customer_id,
-        filename=filename,
+        customer_name=account_holder_name,
         customer_address=customer_address,
+        filename=filename,
         transactions=transactions
     )
 
+def _extract_account_holder(text: str) -> Optional[str]:
+    """Extract account holder name from document text."""
+    # Look for "Account Holder:" label
+    name_match = re.search(r'Account Holder:\s*(.+)', text, re.IGNORECASE)
+    if name_match:
+        name = name_match.group(1).strip()
+        # Take up to the next newline or next labeled field
+        name = re.split(r'\n|Address', name)[0].strip()
+        if len(name) > 2:  # Sanity check
+            return name
+    
+    return None
 
 def _extract_address(text: str) -> Optional[str]:
     """

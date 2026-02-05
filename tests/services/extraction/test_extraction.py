@@ -14,14 +14,9 @@ SAMPLE_PDF_ERROR = "tests/fixtures/statement_error.pdf"
 NON_PDF = "tests/fixtures/non_pdf.txt"
 
 
-@pytest.fixture(scope="module")
-def setup_test_pdfs(tmp_path_factory):
-    """
-    Copy your sample PDFs to a test fixtures directory.
-    In reality, you'd have these checked into tests/fixtures/
-    """
-    # For now, assume they exist - you'll copy statement_clean.pdf and statement_error.pdf there
-    pass
+# @pytest.fixture(scope="module")
+# def setup_test_pdfs(tmp_path_factory):
+#     pass
 
 def test_extract_valid_pdf():
     """Test extraction of a valid PDF with sufficient transactions"""
@@ -105,7 +100,7 @@ def test_extract_insufficient_transactions(mock_extract):
     """Test extraction fails when document has too few transactions"""
     # Mock extraction to return minimal text
     mock_extract.return_value = (
-        "SECURE BANK\nAddress: 123 Test St\nDate Vendor Amount (€) Balance (€)\n01/01/2025 TEST -10.00 100.00",
+        "SECURE BANK\nAccount Holder: John Smith\nAddress: 123 Test St\nDate Vendor Amount (€) Balance (€)\n01/01/2025 TEST -10.00 100.00",
         100.0,
         "pdfplumber"
     )
@@ -128,6 +123,7 @@ def test_extract_missing_address(mock_extract):
     """Test extraction fails when address cannot be found"""
     # Mock extraction to return text without valid address
     mock_extract.return_value = (
+        "Account Holder: John Smith\n" +
         "Date Vendor Amount (€) Balance (€)\n" + 
         "\n".join([f"0{i+1}/01/2025 VENDOR{i} -10.00 {1000-i*10}.00" for i in range(15)]),
         100.0,
@@ -146,12 +142,36 @@ def test_extract_missing_address(mock_extract):
     assert response.status_code == 422
     assert "address" in response.json()["detail"].lower()
 
+@patch('services.extraction.main.extract_text_from_pdf')
+def test_extract_missing_name(mock_extract):
+    """Test extraction fails when name cannot be found"""
+    # Mock extraction to return text without valid name
+    mock_extract.return_value = (
+        "Address: 123 Test St\n" +
+        "Date Vendor Amount (€) Balance (€)\n" + 
+        "\n".join([f"0{i+1}/01/2025 VENDOR{i} -10.00 {1000-i*10}.00" for i in range(15)]),
+        100.0,
+        "pdfplumber"
+    )
+    
+    request_data = {
+        "file_path": "dummy.pdf",
+        "customer_id": "CUST001",
+        "filename": "test.pdf"
+    }
+    
+    with patch('os.path.exists', return_value=True):
+        response = client.post("/extract", json=request_data)
+    
+    assert response.status_code == 422
+    assert "name" in response.json()["detail"].lower()
+
 
 @patch('services.extraction.main.extract_text_from_pdf')
 def test_extract_ocr_fallback(mock_extract):
     """Test that OCR fallback is properly reported"""
     mock_extract.return_value = (
-        "SECURE BANK\nAddress: 123 Test St, Dublin\nDate Vendor Amount (€) Balance (€)\n" +
+        "SECURE BANK\nAccount Holder: John Smith\nAddress: 123 Test St, Dublin\nDate Vendor Amount (€) Balance (€)\n" +
         "\n".join([
             f"{i+1:02d}/01/2025 VENDOR{i} -10.00 {1000 - i*10}.00"
             for i in range(MIN_TRANSACTIONS+1)

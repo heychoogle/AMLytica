@@ -7,7 +7,7 @@ app = FastAPI()
 
 @app.post("/analyse", response_model=AnalysisResponse)
 def analyse_document(req: AnalysisRequest):
-    address = req.address
+    customer = req.customer
     doc = req.document
     transactions = doc.transactions
 
@@ -20,17 +20,31 @@ def analyse_document(req: AnalysisRequest):
 
     # Hard flags
 
+    print("\n")
+
+    ### name mismatch
+    if(customer.name != doc.customer_name):
+        if DEBUG:
+            print(
+                f"Hard flag raised: name_mismatch between Customer profile and provided document\n"
+                f"Document name \"{doc.customer_name}\" should be customer profile name \"{customer.name}\"\n"
+            )
+        hard_flags.append({
+            "type": "name_mismatch",
+            "customer_profile_name": customer.name,
+            "document_name": doc.customer_name,
+        })
+
     ### address mismatch
-    if(address != doc.customer_address):
+    if(customer.address != doc.customer_address):
         if DEBUG:
             print(
                 f"Hard flag raised: address_mismatch between Customer profile and provided document\n"
-                f"Customer profile: {address}\n"
-                f"Document: {doc.customer_address}\n"
+                f"Document address \"{doc.customer_address}\" should be customer profile address \"{customer.address}\"\n"
             )
         hard_flags.append({
             "type": "address_mismatch",
-            "customer_profile_address": address,
+            "customer_profile_address": customer.address,
             "document_address": doc.customer_address,
         })
 
@@ -97,18 +111,17 @@ def analyse_document(req: AnalysisRequest):
             "std_dev_deviation": deviation,
             "std_dev_threshold": SOFT_FLAG_EPSILON
         }
-        for t in transactions
+        for i, t in enumerate(transactions, start=1)
         if std_amt > 0
         and (deviation := round(abs(t.amount - mean_amt) / std_amt, 2)) > Decimal(SOFT_FLAG_EPSILON)
         and (print(
-            f"Soft flag raised: std_dev_outlier at Transaction {t.transaction_id}.\n"
+            f"Soft flag raised: std_dev_outlier at Transaction {i} (ID: {t.transaction_id}).\n"
             f"Deviation {deviation} greater than Soft Flag epsilon value of {SOFT_FLAG_EPSILON}\n"
         ) or True)
     ]
 
     response_data = AnalysisResponse(
-        customer_id=doc.customer_id,
-        customer_address=address,
+        customer=req.customer,
         filename=doc.filename,
         summary={
             "total_inflow": total_inflow,

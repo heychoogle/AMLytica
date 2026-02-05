@@ -26,7 +26,7 @@ def validate_customer_id(customer_id: str):
     
     return customer_id
 
-@app.get("/get_address/{customer_id}")
+@app.get("/get/{customer_id}")
 def get_customer_address(customer_id: str):
     """
     Look up customer by ID.
@@ -40,7 +40,7 @@ def get_customer_address(customer_id: str):
             detail=f"Customer {customer_id} not found"
         )
     
-    return customer["address"][0]
+    return customer
 
 @app.get("/")
 def read_root():

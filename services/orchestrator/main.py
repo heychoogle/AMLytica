@@ -56,7 +56,7 @@ async def run_pipeline(
 
         # customer_lookup service
         customer_resp = await client.get(
-            f"{CL_URL}/get_address/{customer_id}"
+            f"{CL_URL}/get/{customer_id}"
         )
         if customer_resp.status_code != 200:
             raise HTTPException(
@@ -65,14 +65,14 @@ async def run_pipeline(
             )
 
         customer_data = customer_resp.json()
-        print(f"{customer_data}")
 
         # analysis service
         analysis_resp = await client.post(
             f"{ANALYSIS_URL}/analyse",
             json={
                 "document": extraction_data["document"],
-                "address": customer_data},
+                "customer": customer_data
+            },
         )
         if analysis_resp.status_code != 200:
             raise HTTPException(

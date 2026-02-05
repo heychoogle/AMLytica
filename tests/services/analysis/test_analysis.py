@@ -4,9 +4,17 @@ from fastapi.testclient import TestClient
 from fastapi.encoders import jsonable_encoder
 
 from services.analysis.main import app
-from models.models import AnalysisRequest, Document, Transaction
+from models.models import AnalysisRequest, Document, Transaction, Customer
 
 client = TestClient(app)
+
+def sample_customer():
+    """Return a sample customer for testing"""
+    return Customer(
+        customer_id="CUST001",
+        name="John Smith",
+        address="123 Main St, Dublin"
+    )
 
 def sample_transactions():
     """Return a list of sample transactions for testing"""
@@ -21,16 +29,19 @@ def sample_transactions():
         for i in range(5)
     ]
 
-def create_analysis_request(transactions=None):
-    """Create a standard AnalysisRequest with optional custom transactions"""
+def create_analysis_request(transactions=None, customer=None):
+    """Create a standard AnalysisRequest with optional custom transactions and customer"""
     transactions = transactions if transactions is not None else sample_transactions()
+    customer = customer if customer is not None else sample_customer()
+    
     doc = Document(
-        customer_id="CUST001",
+        customer_id=customer.customer_id,
+        customer_name=customer.name,
+        customer_address=customer.address,
         filename="statement.pdf",
-        customer_address="123 Main St, Dublin",
         transactions=transactions
     )
-    return AnalysisRequest(document=doc, address=doc.customer_address)
+    return AnalysisRequest(document=doc, customer=customer)
 
 def test_analysis_clean_no_flags():
     """Test analysis with normal transactions, expect no flags"""
@@ -75,14 +86,22 @@ def test_analysis_date_mismatch_hard_flag():
     assert mismatch_flag["actual_date"] != mismatch_flag["expected_date"]
 
 def test_analysis_address_mismatch_hard_flag():
-    """Inject out-of-order date to trigger a date mismatch"""
+    """Test address mismatch between customer profile and document"""
+    customer = Customer(
+        customer_id="CUST001",
+        name="John Smith",
+        address="124 Main St, London"
+    )
+    
     doc = Document(
         customer_id="CUST001",
-        filename="empty.pdf",
+        customer_name="John Smith",
         customer_address="123 Main St, Dublin",
+        filename="statement.pdf",
         transactions=[]
     )
-    req = AnalysisRequest(document=doc, address="124 Main St, London")
+    
+    req = AnalysisRequest(document=doc, customer=customer)
     response = client.post("/analyse", json=jsonable_encoder(req))
     
     assert response.status_code == 200
@@ -92,6 +111,33 @@ def test_analysis_address_mismatch_hard_flag():
     assert any(f["type"] == "address_mismatch" for f in hard_flags)
     mismatch_flag = next(f for f in hard_flags if f["type"] == "address_mismatch")
     assert mismatch_flag["customer_profile_address"] != mismatch_flag["document_address"]
+
+def test_analysis_name_mismatch_hard_flag():
+    """Test address mismatch between customer profile and document"""
+    customer = Customer(
+        customer_id="CUST001",
+        name="John Smith",
+        address="124 Main St, London"
+    )
+    
+    doc = Document(
+        customer_id="CUST001",
+        customer_name="Jane Doe",
+        customer_address="124 Main St, London",
+        filename="statement.pdf",
+        transactions=[]
+    )
+    
+    req = AnalysisRequest(document=doc, customer=customer)
+    response = client.post("/analyse", json=jsonable_encoder(req))
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    hard_flags = data["alerts"]["hard_flags"]
+    assert any(f["type"] == "name_mismatch" for f in hard_flags)
+    mismatch_flag = next(f for f in hard_flags if f["type"] == "name_mismatch")
+    assert mismatch_flag["customer_profile_name"] != mismatch_flag["document_name"]
 
 
 def test_analysis_soft_flag_outlier():
@@ -119,13 +165,17 @@ def test_analysis_soft_flag_outlier():
 
 def test_analysis_empty_transactions():
     """Analysis on document with no transactions should return zeros and no crashes"""
+    customer = sample_customer()
+    
     doc = Document(
-        customer_id="CUST001",
+        customer_id=customer.customer_id,
+        customer_name=customer.name,
+        customer_address=customer.address,
         filename="empty.pdf",
-        customer_address="123 Main St, Dublin",
         transactions=[]
     )
-    req = AnalysisRequest(document=doc, address=doc.customer_address)
+    
+    req = AnalysisRequest(document=doc, customer=customer)
     response = client.post("/analyse", json=jsonable_encoder(req))
     
     assert response.status_code == 200

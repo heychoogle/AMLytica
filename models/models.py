@@ -12,17 +12,22 @@ class Transaction(BaseModel):
 
 class Document(BaseModel):
     customer_id: str
-    filename: str
+    customer_name: str
     customer_address: str
+    filename: str
     transactions: list[Transaction]
 
-class AnalysisRequest(BaseModel):
-    document: Document
+class Customer(BaseModel):
+    customer_id: str
+    name: str
     address: str
 
+class AnalysisRequest(BaseModel):
+    customer: Customer
+    document: Document
+
 class AnalysisResponse(BaseModel):
-    customer_id: str
-    customer_address: str
+    customer: Customer
     filename: str
     summary: Dict[str, Decimal]
     alerts: Dict[str, List[Dict[str, Any]]]
