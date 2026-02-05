@@ -71,8 +71,28 @@ def test_analysis_date_mismatch_hard_flag():
     
     hard_flags = data["alerts"]["hard_flags"]
     assert any(f["type"] == "date_mismatch" for f in hard_flags)
-    date_flag = next(f for f in hard_flags if f["type"] == "date_mismatch")
-    assert date_flag["actual_date"] != date_flag["expected_date"]
+    mismatch_flag = next(f for f in hard_flags if f["type"] == "date_mismatch")
+    assert mismatch_flag["actual_date"] != mismatch_flag["expected_date"]
+
+def test_analysis_address_mismatch_hard_flag():
+    """Inject out-of-order date to trigger a date mismatch"""
+    doc = Document(
+        customer_id="CUST001",
+        filename="empty.pdf",
+        customer_address="123 Main St, Dublin",
+        transactions=[]
+    )
+    req = AnalysisRequest(document=doc, address="124 Main St, London")
+    response = client.post("/analyse", json=jsonable_encoder(req))
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    hard_flags = data["alerts"]["hard_flags"]
+    assert any(f["type"] == "address_mismatch" for f in hard_flags)
+    mismatch_flag = next(f for f in hard_flags if f["type"] == "address_mismatch")
+    assert mismatch_flag["customer_profile_address"] != mismatch_flag["document_address"]
+
 
 def test_analysis_soft_flag_outlier():
     """Inject an extreme transaction to trigger a soft flag"""
