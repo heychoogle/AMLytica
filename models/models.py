@@ -37,8 +37,13 @@ class ExtractionRequest(BaseModel):
     customer_id: str
     filename: str
 
-
 class ExtractionResponse(BaseModel):
     document: Document
     extraction_method: str
     confidence: float
+
+class ReportRequest(BaseModel):
+    analysis: AnalysisResponse
+
+class ReportResponse(BaseModel):
+    flags: Dict

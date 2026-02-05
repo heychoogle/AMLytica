@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 import httpx
-from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL, ANALYSIS_URL
+from services.orchestrator.config import INGEST_URL, CL_URL, EXTRACTION_URL, ANALYSIS_URL, REPORT_URL
 
 app = FastAPI()
 
@@ -52,7 +52,6 @@ async def run_pipeline(
             )
 
         extraction_data = extract_resp.json()
-        print(extract_resp.json())
 
         # customer_lookup service
         customer_resp = await client.get(
@@ -82,21 +81,22 @@ async def run_pipeline(
 
         analysis_data = analysis_resp.json()
 
-        # # 5. Generate report
-        # report_resp = await client.post(
-        #     f"{REPORT_URL}/generate",
-        #     json={
-        #         "document": extraction_data["document"],
-        #         "analysis": analysis_data,
-        #     },
-        # )
-        # if report_resp.status_code != 200:
-        #     raise HTTPException(
-        #         status_code=500,
-        #         detail="Report generation failed"
-        #     )
+        # 5. Generate report
+        report_resp = await client.post(
+            f"{REPORT_URL}/generate",
+            json={
+                "analysis": analysis_data,
+            },
+        )
+        if report_resp.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail="Report generation failed"
+            )
+
+        report_data = report_resp.json()
 
         return {
             "status": "complete",
-            "report": analysis_data,
+            "report": report_data,
         }
