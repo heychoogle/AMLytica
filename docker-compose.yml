@@ -1,0 +1,85 @@
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orchestrator
+    command: uvicorn services.orchestrator.main:app --host 0.0.0.0 --port ${ORCH_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${ORCH_PORT}:${ORCH_PORT}"
+    volumes:
+      - ./:/app
+      - ./uploads:/app/uploads
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ingest
+    command: uvicorn services.ingest.main:app --host 0.0.0.0 --port ${INGEST_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${INGEST_PORT}:${INGEST_PORT}"
+    volumes:
+      - ./:/app
+      - ./uploads:/app/uploads
+
+  customer_lookup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: customer_lookup
+    command: uvicorn services.customer_lookup.main:app --host 0.0.0.0 --port ${CL_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${CL_PORT}:${CL_PORT}"
+    volumes:
+      - ./:/app
+
+  extraction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: extraction
+    command: uvicorn services.extraction.main:app --host 0.0.0.0 --port ${EXTRACTION_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${EXTRACTION_PORT}:${EXTRACTION_PORT}"
+    volumes:
+      - ./:/app
+
+  analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: analysis
+    command: uvicorn services.analysis.main:app --host 0.0.0.0 --port ${ANALYSIS_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${ANALYSIS_PORT}:${ANALYSIS_PORT}"
+    volumes:
+      - ./:/app
+
+  report:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: report
+    command: uvicorn services.report.main:app --host 0.0.0.0 --port ${REPORT_PORT} --reload
+    env_file:
+      - .env
+    ports:
+      - "${REPORT_PORT}:${REPORT_PORT}"
+    volumes:
+      - ./:/app
+      - ./uploads:/app/uploads
+
+networks:
+  default:
+    driver: bridge
