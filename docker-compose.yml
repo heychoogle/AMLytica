@@ -1,85 +1,122 @@
 services:
-  orchestrator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: orchestrator
-    command: uvicorn services.orchestrator.main:app --host 0.0.0.0 --port ${ORCH_PORT} --reload
-    env_file:
-      - .env
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-amlytica}
     ports:
-      - "${ORCH_PORT}:${ORCH_PORT}"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-amlytica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # migration runner
+  alembic_upgrade:
+    build: .
+    container_name: alembic_upgrade
+    command: alembic upgrade head
+    env_file: .env
     volumes:
       - ./:/app
-      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  customer_lookup:
+    build: .
+    container_name: customer_lookup
+    command: uvicorn services.customer_lookup.main:app --host 0.0.0.0 --port 8001
+    env_file: .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+    depends_on:
+      alembic_upgrade:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   ingest:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: ingest
-    command: uvicorn services.ingest.main:app --host 0.0.0.0 --port ${INGEST_PORT} --reload
-    env_file:
-      - .env
+    command: uvicorn services.ingest.main:app --host 0.0.0.0 --port ${INGEST_PORT}
+    env_file: .env
     ports:
       - "${INGEST_PORT}:${INGEST_PORT}"
     volumes:
       - ./:/app
-      - ./uploads:/app/uploads
-
-  customer_lookup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: customer_lookup
-    command: uvicorn services.customer_lookup.main:app --host 0.0.0.0 --port ${CL_PORT} --reload
-    env_file:
-      - .env
-    ports:
-      - "${CL_PORT}:${CL_PORT}"
-    volumes:
-      - ./:/app
+      - ./data:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      alembic_upgrade:
+        condition: service_completed_successfully
 
   extraction:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: extraction
-    command: uvicorn services.extraction.main:app --host 0.0.0.0 --port ${EXTRACTION_PORT} --reload
-    env_file:
-      - .env
-    ports:
-      - "${EXTRACTION_PORT}:${EXTRACTION_PORT}"
+    command: python -m services.extraction.worker
+    env_file: .env
     volumes:
       - ./:/app
+      - ./data:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      customer_lookup:
+        condition: service_healthy
+      alembic_upgrade:
+        condition: service_completed_successfully
 
   analysis:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: analysis
-    command: uvicorn services.analysis.main:app --host 0.0.0.0 --port ${ANALYSIS_PORT} --reload
-    env_file:
-      - .env
-    ports:
-      - "${ANALYSIS_PORT}:${ANALYSIS_PORT}"
+    command: python -m services.analysis.worker
+    env_file: .env
     volumes:
       - ./:/app
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      alembic_upgrade:
+        condition: service_completed_successfully
 
   report:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: report
-    command: uvicorn services.report.main:app --host 0.0.0.0 --port ${REPORT_PORT} --reload
-    env_file:
-      - .env
-    ports:
-      - "${REPORT_PORT}:${REPORT_PORT}"
+    command: python -m services.report.worker
+    env_file: .env
     volumes:
       - ./:/app
-      - ./uploads:/app/uploads
+      - ./data:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      alembic_upgrade:
+        condition: service_completed_successfully
 
-networks:
-  default:
-    driver: bridge
+volumes:
+  postgres_data:
