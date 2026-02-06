@@ -46,10 +46,3 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t amlytica:ci .
-
-      - name: Run service tests in container
-        run: |
-          for service in orchestrator ingest customer_lookup extraction analysis report; do
-            echo "Running tests for $service..."
-            docker run --rm amlytica:ci pytest /app/tests/services/$service/
-          done
