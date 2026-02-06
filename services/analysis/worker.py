@@ -1,14 +1,26 @@
-from fastapi import FastAPI
-from models.models import AnalysisRequest, AnalysisResponse
+import asyncio
+import aio_pika
+import json
+import statistics
 from decimal import Decimal
-from services.analysis.config import DEBUG, SOFT_FLAG_EPSILON
+from sqlalchemy import update
+from shared.db import AsyncSessionLocal
+from shared.models import Job, JobEvent
+from models.models import AnalysisResponse, Document, Customer
+from services.analysis.config import DEBUG, SOFT_FLAG_EPSILON, RABBITMQ_URL, INPUT_QUEUE, OUTPUT_QUEUE
 
-app = FastAPI()
+async def update_job_status(job_id: str, status: str, message: str = None):
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            await session.execute(
+                update(Job).where(Job.job_id == job_id).values(current_status=status)
+            )
+            event = JobEvent(job_id=job_id, status=status, message=message)
+            session.add(event)
 
-@app.post("/analyse", response_model=AnalysisResponse)
-def analyse_document(req: AnalysisRequest):
-    customer = req.customer
-    doc = req.document
+async def perform_analysis(data: dict) -> dict:
+    customer = Customer(**data['customer'])
+    doc = Document(**data['document'])
     transactions = doc.transactions
 
     hard_flags = []
@@ -19,7 +31,6 @@ def analyse_document(req: AnalysisRequest):
     avg_daily_balance = sum(t.balance for t in transactions) / Decimal(len(transactions)) if transactions else Decimal(0)
 
     # Hard flags
-
     print("\n")
 
     ### name mismatch
@@ -86,13 +97,9 @@ def analyse_document(req: AnalysisRequest):
                 "transaction_id": t.transaction_id,
                 "expected_balance": expected_balance,
                 "actual_balance": t.balance,
-
             })
 
-
-
     # Soft flags
-    import statistics
     amounts = [t.amount for t in transactions]
     if len(amounts) > 1:
         mean_amt = statistics.mean(amounts)
@@ -121,7 +128,7 @@ def analyse_document(req: AnalysisRequest):
     ]
 
     response_data = AnalysisResponse(
-        customer=req.customer,
+        customer=customer,
         filename=doc.filename,
         summary={
             "total_inflow": total_inflow,
@@ -135,4 +142,47 @@ def analyse_document(req: AnalysisRequest):
         }
     )
 
-    return response_data
+    return response_data.dict()
+
+async def process_message(message: aio_pika.IncomingMessage):
+    async with message.process():
+        job_id = message.correlation_id
+        body = json.loads(message.body.decode())
+        
+        print(f"[*] [{job_id}] Analyzing: {body['customer']['name']}")
+        await update_job_status(job_id, "ANALYSIS_STARTED")
+        
+        try:
+            results = await perform_analysis(body)
+            connection = await aio_pika.connect_robust(RABBITMQ_URL)
+            async with connection:
+                channel = await connection.channel()
+                await channel.declare_queue(OUTPUT_QUEUE, durable=True)
+                await channel.default_exchange.publish(
+                    aio_pika.Message(
+                        body=json.dumps(results, default=str).encode(),
+                        delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                        correlation_id=job_id
+                    ),
+                    routing_key=OUTPUT_QUEUE
+                )
+            
+            print(f"[+] [{job_id}] Analysis finished.")
+            await update_job_status(job_id, "ANALYSIS_SUCCESS", json.dumps(results, default=str))
+
+        except Exception as e:
+            print(f"[!] [{job_id}] Analysis error: {e}")
+            await update_job_status(job_id, "ANALYSIS_FAILED", str(e))
+
+async def main():
+    connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    async with connection:
+        channel = await connection.channel()
+        await channel.set_qos(prefetch_count=1)
+        queue = await channel.declare_queue(INPUT_QUEUE, durable=True)
+        print(f" [*] Analysis Worker active. Listening on {INPUT_QUEUE}...")
+        await queue.consume(process_message)
+        await asyncio.Future()
+
+if __name__ == "__main__":
+    asyncio.run(main())

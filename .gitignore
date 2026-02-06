@@ -1,6 +1,7 @@
 venv/
 .env
 uploads/*
+data/
 __pycache__/
 *.pyc
 *.code-workspace
