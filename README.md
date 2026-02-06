@@ -38,7 +38,7 @@ This project is a financial document (bank statement) processing pipeline built 
    - Generates structured reports highlighting risks and flagged issues on a per document basis  
 
 ## Service Data Flow
-![Data Flow](./assets/data_flow.gif)
+![](https://github.com/heychoogle/AMLytica/blob/master/assets/data_flow.gif)
 
 ## Current vs Future Features
 
