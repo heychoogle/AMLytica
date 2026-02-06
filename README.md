@@ -55,4 +55,3 @@ This project is a financial document (bank statement) processing pipeline built 
 - Automatic debit/credit classification in OCR output.  
 - Improved parsing for messy OCR outputs (e.g., misaligned columns, missing signs).  
 - Enhanced confidence scoring and error handling for OCR-extracted data.
-T
