@@ -2,13 +2,10 @@ import os
 import time
 
 def save_uploaded_file(upload_dir: str, filename: str, content: bytes) -> str:
-    """
-    Save uploaded file content to the given directory and return the path.
-    Sanitizes filename to prevent path traversal attacks.
-    """
+
     os.makedirs(upload_dir, exist_ok=True)
     
-    # Sanitize filename - strip path components and keep only basename
+    # sanitise filename
     safe_filename = os.path.basename(filename)
     
     # filename sanity check, if somehow still empty or just "."

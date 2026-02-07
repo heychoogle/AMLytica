@@ -7,22 +7,8 @@ from services.extraction.config import MIN_TRANSACTIONS, DEBUG
 
 
 def parse_document(raw_text: str, customer_id: str, filename: str) -> Document:
-    """
-    Parse raw extracted text into a structured Document object.
     
-    Args:
-        raw_text: The full text extracted from the PDF
-        customer_id: Customer ID from upstream
-        filename: Original filename
-    
-    Returns:
-        Document object with parsed transactions and metadata
-    
-    Raises:
-        ValueError: If unable to parse required fields or insufficient transactions
-    """
-    
-    # Extract account holder name
+    # Extract account holder
     account_holder_name = _extract_account_holder(raw_text)
     
     if not account_holder_name:
@@ -55,132 +41,114 @@ def parse_document(raw_text: str, customer_id: str, filename: str) -> Document:
     )
 
 def _extract_account_holder(text: str) -> Optional[str]:
-    """Extract account holder name from document text."""
-    # Look for "Account Holder:" label
-    name_match = re.search(r'Account Holder:\s*(.+)', text, re.IGNORECASE)
-    if name_match:
-        name = name_match.group(1).strip()
-        # Take up to the next newline or next labeled field
-        name = re.split(r'\n|Address', name)[0].strip()
-        if len(name) > 2:  # Sanity check
-            return name
+    patterns = [
+        r"(?i)Account\s*Holder\s*:\s*(.*)",
+        r"(?i)Name\s*:\s*(.*)"
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            # Clean up the line
+            raw_name = match.group(1).strip()
+            # Stop if we hit another common label or a double newline
+            clean_name = re.split(r'(?i)Address|Date|Statement|\n', raw_name)[0]
+            # Remove artifacts like | or *
+            clean_name = re.sub(r'[|*]', '', clean_name).strip()
+            
+            if len(clean_name) > 1:
+                return clean_name
     
     return None
 
 def _extract_address(text: str) -> Optional[str]:
-    """
-    Extract customer address from document text.
-    
-    Looks for patterns like:
-    - "Address: 123 Main St..."
-    - Lines containing street numbers and postcodes
-    """
-    
-    # Try explicit "Address:" label first
-    address_match = re.search(r'Address:\s*(.+)', text, re.IGNORECASE)
+
+    # explicit regex
+    address_match = re.search(r"(?i)Address\s*:\s*(.*)", text)
     if address_match:
-        address_line = address_match.group(1).strip()
-        # Take up to the next newline or next labeled field
-        address_line = re.split(r'\n|Account', address_line)[0].strip()
-        if len(address_line) > 10:  # Sanity check
-            return address_line
-    
-    # Fallback: Look for common address patterns (number + street + area/city)
-    # This is a simple heuristic
-    lines = text.split('\n')
+        raw_address = address_match.group(1).strip()
+
+        clean_address = re.split(r'(?i)Account|Date|Statement|\n\n', raw_address)[0]
+        clean_address = re.sub(r'[|*]', '', clean_address).strip()
+        if len(clean_address) > 5:
+            return clean_address
+
+    # heuristic search, lines with City/Country/Postcode patterns
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
     for i, line in enumerate(lines):
-        # Look for lines with numbers and common address words
-        if re.search(r'\d+\s+\w+\s+(Street|St|Avenue|Ave|Road|Rd)', line, re.IGNORECASE):
-            # Potentially an address - take this line and maybe the next
-            address_parts = [line.strip()]
+        if re.search(r'\d+\s+[A-Za-z\s]+(Street|St|Avenue|Ave|Road|Rd|Way|Lane|Ln|Drive|Dr)', line, re.IGNORECASE):
+            full_addr = line
             if i + 1 < len(lines):
-                next_line = lines[i + 1].strip()
-                # If next line looks like city/postcode, include it
-                if re.search(r'[A-Z][a-z]+|[A-Z0-9\s]+', next_line):
-                    address_parts.append(next_line)
-            return ', '.join(address_parts)
-    
+                full_addr += ", " + lines[i+1]
+            return re.sub(r'[|*]', '', full_addr).strip()
+
     return None
 
 
 def _extract_transactions(raw_text: str, customer_id: str, filename: str) -> List[Transaction]:
-    """
-    Extract transaction table from raw text and parse into Transaction objects.
-    
-    Expected format:
-    Date        Vendor              Amount (€)    Balance (€)
-    01/01/2025  TESCO STORES        -45.23        1234.56
-    """
-    
     transactions = []
     lines = raw_text.split('\n')
     
-    # Find the transaction table (look for header row)
     table_start = None
     for i, line in enumerate(lines):
-        # Look for header containing date, amount, balance keywords
-        if re.search(r'Date.*Amount.*Balance', line, re.IGNORECASE):
-            table_start = i + 1  # Data starts after header
+        if any(keyword in line.upper() for keyword in ["DATE", "VENDOR", "AMOUNT", "BALANCE"]):
+            table_start = i + 1
             break
     
     if table_start is None:
-        if DEBUG:
-            print("Warning: Could not find transaction table header")
-        return transactions
-    
-    # Parse transaction rows
+        return []
+
     txn_counter = 1
     for line in lines[table_start:]:
         line = line.strip()
-        if not line:
-            continue
-        
-        # Pattern: DD/MM/YYYY VENDOR_NAME +/-AMOUNT BALANCE
-        # Use regex to extract components
-        # Date: DD/MM/YYYY
-        # Vendor: Everything between date and amount
-        # Amount: +/- followed by digits and decimal
-        # Balance: Final number
-        
-        match = re.match(
-            r'(\d{2}/\d{2}/\d{4})\s+(.+?)\s+([-+]?\d+\.\d{2})\s+(\d+\.\d{2})$',
-            line
-        )
-        
-        if not match:
-            continue
-        
-        date_str = match.group(1)
-        vendor = match.group(2).strip()
-        amount_str = match.group(3)
-        balance_str = match.group(4)
-        
-        # Parse amount and balance
-        try:
-            amount = Decimal(amount_str)
-            balance = Decimal(balance_str)
-        except ValueError:
-            if DEBUG:
-                print(f"Failed to parse transaction: {line}")
-            continue
-        
-        # Generate transaction ID
-        filename_base = filename.replace('.pdf', '').replace('.', '_')
-        txn_id = f"{customer_id}_{filename_base}_{txn_counter:03d}"
-        
-        date_obj = datetime.strptime(date_str, "%d/%m/%Y")
+        if not line: continue
 
-        transactions.append(Transaction(
-            transaction_id=txn_id,
-            date=date_obj,
-            vendor=vendor,
-            amount=amount,
-            balance=balance
-        ))
+        # date extraction
+        date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', line)
+        if not date_match:
+            continue
         
-        txn_counter += 1
-    
-    if DEBUG:
-        print(f"Extracted {len(transactions)} transactions")
-    
+        date_str = date_match.group(1)
+        remaining_text = line.replace(date_str, "").strip()
+
+        # extract numbers
+        amount_matches = re.findall(r'([-+]?\d{1,3}(?:,\d{3})*\.\d{2}|[-+]?\d+\.\d{2})', remaining_text)
+
+        if len(amount_matches) < 2:
+            continue
+
+        try:
+            # usual amount/balance order
+            amount_str = amount_matches[-2]
+            balance_str = amount_matches[-1]
+
+            # extract vendor
+            vendor = remaining_text.replace(amount_str, "").replace(balance_str, "").strip()
+            vendor = re.sub(r'[|€$¥]', '', vendor).strip()
+
+            # cleaning data to convert to Decimal
+            amount = Decimal(amount_str.replace(',', ''))
+            balance = Decimal(balance_str.replace(',', ''))
+            
+            # date normalisation
+            try:
+                date_obj = datetime.strptime(date_str, "%d/%m/%Y")
+            except ValueError:
+                date_obj = datetime.strptime(date_str, "%d/%m/%y")
+
+            txn_id = f"{customer_id}_{filename.split('.')[0]}_{txn_counter:03d}"
+            
+            transactions.append(Transaction(
+                transaction_id=txn_id,
+                date=date_obj,
+                vendor=vendor,
+                amount=amount,
+                balance=balance
+            ))
+            txn_counter += 1
+
+        except Exception as e:
+            if DEBUG: print(f"Row skip: {e} on line: {line}")
+            continue
+            
     return transactions

@@ -5,6 +5,4 @@ load_dotenv()
 
 DEBUG = os.getenv("DEBUG") == "True"
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-)
+DATABASE_URL = os.getenv("DATABASE_URL")

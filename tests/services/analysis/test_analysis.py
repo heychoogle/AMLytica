@@ -3,7 +3,6 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from fastapi.encoders import jsonable_encoder
 
-from services.analysis.main import app
 from models.models import AnalysisRequest, Document, Transaction, Customer
 
 client = TestClient(app)

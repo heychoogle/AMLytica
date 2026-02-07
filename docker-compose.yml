@@ -42,7 +42,6 @@ services:
 
   customer_lookup:
     build: .
-    container_name: customer_lookup
     command: uvicorn services.customer_lookup.main:app --host 0.0.0.0 --port 8001
     env_file: .env
     ports:
@@ -61,7 +60,6 @@ services:
 
   ingest:
     build: .
-    container_name: ingest
     command: uvicorn services.ingest.main:app --host 0.0.0.0 --port ${INGEST_PORT}
     env_file: .env
     ports:
@@ -77,7 +75,6 @@ services:
 
   extraction:
     build: .
-    container_name: extraction
     command: python -m services.extraction.worker
     env_file: .env
     volumes:
@@ -93,7 +90,6 @@ services:
 
   analysis:
     build: .
-    container_name: analysis
     command: python -m services.analysis.worker
     env_file: .env
     volumes:
@@ -106,7 +102,6 @@ services:
 
   report:
     build: .
-    container_name: report
     command: python -m services.report.worker
     env_file: .env
     volumes:
@@ -115,6 +110,20 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      alembic_upgrade:
+        condition: service_completed_successfully
+
+  dashboard:
+    build: .
+    command: streamlit run services/dashboard/main.py --server.port 8501 --server.address 0.0.0.0
+    env_file: .env
+    environment:
+      - PYTHONPATH=/app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./:/app
+    depends_on:
       alembic_upgrade:
         condition: service_completed_successfully
 

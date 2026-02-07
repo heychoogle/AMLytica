@@ -20,6 +20,7 @@ class JobEvent(Base):
     job_id = Column(String, ForeignKey("jobs.job_id"))
     status = Column(String) 
     message = Column(Text, nullable=True)
+    worker_name = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     job = relationship("Job", back_populates="events")

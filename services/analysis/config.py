@@ -11,5 +11,4 @@ OUTPUT_QUEUE = os.getenv("ANALYSIS_RESULTS_QUEUE")
 
 SOFT_FLAG_EPSILON = float(os.getenv("SOFT_FLAG_EPSILON", 2))
 
-# Debug mode
 DEBUG = os.getenv("DEBUG") == "True"

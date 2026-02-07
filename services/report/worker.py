@@ -8,13 +8,20 @@ from shared.db import AsyncSessionLocal
 from shared.models import Job, JobEvent
 from services.report.config import RABBITMQ_URL, INPUT_QUEUE, REPORTS_DIR
 
+WORKER_NAME = os.getenv('HOSTNAME', 'extraction_worker_local')
+
 async def update_job_status(job_id: str, status: str, message: str = None):
     async with AsyncSessionLocal() as session:
         async with session.begin():
             await session.execute(
                 update(Job).where(Job.job_id == job_id).values(current_status=status)
             )
-            event = JobEvent(job_id=job_id, status=status, message=message)
+            event = JobEvent(
+                job_id=job_id, 
+                status=status, 
+                message=message,
+                worker_name=WORKER_NAME
+            )
             session.add(event)
 
 async def process_message(message: aio_pika.IncomingMessage):
